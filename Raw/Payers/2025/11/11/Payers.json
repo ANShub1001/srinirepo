@@ -1,0 +1,92 @@
+[
+    {
+        "Id":"b3221cfc-24fb-339e-823d-bc4136cbc4ed",
+        "NAME":"Dual Eligible",
+        "ADDRESS":"7500 Security Blvd",
+        "CITY":"Baltimore",
+        "STATE_HEADQUARTERED":"MD",
+        "ZIP":21244.0,
+        "PHONE":"1-877-267-2323"
+    },
+    {
+        "Id":"7caa7254-5050-3b5e-9eae-bd5ea30e809c",
+        "NAME":"Medicare",
+        "ADDRESS":"7500 Security Blvd",
+        "CITY":"Baltimore",
+        "STATE_HEADQUARTERED":"MD",
+        "ZIP":21244.0,
+        "PHONE":"1-800-633-4227"
+    },
+    {
+        "Id":"7c4411ce-02f1-39b5-b9ec-dfbea9ad3c1a",
+        "NAME":"Medicaid",
+        "ADDRESS":"7500 Security Blvd",
+        "CITY":"Baltimore",
+        "STATE_HEADQUARTERED":"MD",
+        "ZIP":21244.0,
+        "PHONE":"1-877-267-2323"
+    },
+    {
+        "Id":"d47b3510-2895-3b70-9897-342d681c769d",
+        "NAME":"Humana",
+        "ADDRESS":"500 West Main St",
+        "CITY":"Louisville",
+        "STATE_HEADQUARTERED":"KY",
+        "ZIP":40018.0,
+        "PHONE":"1-844-330-7799"
+    },
+    {
+        "Id":"6e2f1a2d-27bd-3701-8d08-dae202c58632",
+        "NAME":"Blue Cross Blue Shield",
+        "ADDRESS":"Michigan Plaza",
+        "CITY":"Chicago",
+        "STATE_HEADQUARTERED":"IL",
+        "ZIP":60007.0,
+        "PHONE":"1-800-262-2583"
+    },
+    {
+        "Id":"5059a55e-5d6e-34d1-b6cb-d83d16e57bcf",
+        "NAME":"UnitedHealthcare",
+        "ADDRESS":"9800 Healthcare Lane",
+        "CITY":"Minnetonka",
+        "STATE_HEADQUARTERED":"MN",
+        "ZIP":55436.0,
+        "PHONE":"1-888-545-5205"
+    },
+    {
+        "Id":"4d71f845-a6a9-3c39-b242-14d25ef86a8d",
+        "NAME":"Aetna",
+        "ADDRESS":"151 Farmington Ave",
+        "CITY":"Hartford",
+        "STATE_HEADQUARTERED":"CT",
+        "ZIP":6156.0,
+        "PHONE":"1-800-872-3862"
+    },
+    {
+        "Id":"047f6ec3-6215-35eb-9608-f9dda363a44c",
+        "NAME":"Cigna Health",
+        "ADDRESS":"900 Cottage Grove Rd",
+        "CITY":"Bloomfield",
+        "STATE_HEADQUARTERED":"CT",
+        "ZIP":6002.0,
+        "PHONE":"1-800-997-1654"
+    },
+    {
+        "Id":"42c4fca7-f8a9-3cd1-982a-dd9751bf3e2a",
+        "NAME":"Anthem",
+        "ADDRESS":"220 Virginia Ave",
+        "CITY":"Indianapolis",
+        "STATE_HEADQUARTERED":"IN",
+        "ZIP":46204.0,
+        "PHONE":"1-800-331-1476"
+    },
+    {
+        "Id":"b1c428d6-4f07-31e0-90f0-68ffa6ff8c76",
+        "NAME":"NO_INSURANCE",
+        "ADDRESS":null,
+        "CITY":null,
+        "STATE_HEADQUARTERED":null,
+        "ZIP":null,
+        "PHONE":null
+    }
+]
