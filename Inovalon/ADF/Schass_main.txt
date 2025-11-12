@@ -1,0 +1,188 @@
+{
+    "name": "Synch_SCHaaSMain",
+    "properties": {
+        "activities": [
+            {
+                "name": "log_the_process",
+                "type": "ExecutePipeline",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "Audit_pipeline",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "execution": "processlog",
+                        "status": "start",
+                        "batchid": {
+                            "value": "@pipeline().parameters.batchid",
+                            "type": "Expression"
+                        },
+                        "groupid": {
+                            "value": "@pipeline().parameters.groupid",
+                            "type": "Expression"
+                        },
+                        "objectname": "Bronze.SCHaaS.XXXXX",
+                        "etlprogram": {
+                            "value": "@pipeline().Pipeline",
+                            "type": "Expression"
+                        },
+                        "sourcetable": "XXXXX",
+                        "etlphaseId": 3
+                    }
+                }
+            },
+            {
+                "name": "log_the_process_log_and_finish",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    {
+                        "activity": "test_script",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "Audit_pipeline",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "execution": "processlog",
+                        "status": "end",
+                        "processlogid": {
+                            "value": "@variables('audit_processlogid')",
+                            "type": "Expression"
+                        },
+                        "recordprocessed": 0,
+                        "recordinserted": 0,
+                        "recordupdated": 100,
+                        "recordwitherror": 0,
+                        "comment": "SCHaaS Data was Synched successfully",
+                        "endtime": {
+                            "value": "@utcNow()",
+                            "type": "Expression"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "get_the_returned_processlogid",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "log_the_process",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "audit_processlogid",
+                    "value": {
+                        "value": "@activity('log_the_process').output.pipelineReturnValue.ReturnedProcesslogID.firstRow.ProcessLogID",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "test_script",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "get_the_returned_processlogid",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "SqlServerSource",
+                        "sqlReaderQuery": "select 1/0",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "sqlserver_phoenix_audit_ds",
+                        "type": "DatasetReference"
+                    }
+                }
+            },
+            {
+                "name": "log_the_error",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    {
+                        "activity": "test_script",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "Audit_pipeline",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "execution": "errorlog",
+                        "objectname": "Bronze.SCHaaS.XXXXX",
+                        "etlprogram": {
+                            "value": "@pipeline().Pipeline",
+                            "type": "Expression"
+                        },
+                        "processlogid": {
+                            "value": "@variables('audit_processlogid')",
+                            "type": "Expression"
+                        },
+                        "recordprocessed": 0,
+                        "comment": "Synch Apollo Data Failed with one or more data exception",
+                        "errormessage": {
+                            "value": "@activity('test_script').Error.Message",
+                            "type": "Expression"
+                        }
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "batchid": {
+                "type": "int",
+                "defaultValue": 1
+            },
+            "groupid": {
+                "type": "int",
+                "defaultValue": 1
+            }
+        },
+        "variables": {
+            "audit_processlogid": {
+                "type": "Integer"
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2023-09-01T20:02:45Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}

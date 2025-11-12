@@ -1,0 +1,1258 @@
+{
+    "name": "Synch_Main",
+    "properties": {
+        "activities": [
+            {
+                "name": "Batch_type",
+                "type": "IfCondition",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(pipeline().parameters.execution,'ad-hoc')",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Start_the_Adhoc__Batch",
+                            "type": "Lookup",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "SqlServerSource",
+                                    "sqlReaderQuery": {
+                                        "value": "@concat('declare @BatchId int ',\n        'exec dbo.usp_ETLStartBatch ',\n\t\t' @Comment= ''AdHoc Batch Start'' ',\n\t\t', @GroupID=', string(pipeline().parameters.groupid),\n\t\t', @BatchId= @BatchId OUTPUT ',\n\t\t' select @BatchId as BatchId'\n       )",
+                                        "type": "Expression"
+                                    },
+                                    "queryTimeout": "02:00:00",
+                                    "partitionOption": "None"
+                                },
+                                "dataset": {
+                                    "referenceName": "sqlserver_phoenix_audit_ds",
+                                    "type": "DatasetReference"
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get_Batchid",
+                            "type": "SetVariable",
+                            "dependsOn": [
+                                {
+                                    "activity": "Start_the_Adhoc__Batch",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "batchid",
+                                "value": {
+                                    "value": "@activity('Start_the_Adhoc__Batch').output.firstRow['BatchId']",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Synch_only_Apollo",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "get_the_returned_processlogid",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(concat(pipeline().parameters.allsources,pipeline().parameters.apollo), '01')",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "synch_only_apollo_pipeline",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_ApolloMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_soa_synch_main",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "synch_only_apollo_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_Apollo: ',activity('synch_only_apollo_pipeline').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_only_apollo",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "synch_only_apollo_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (Apollo source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Synch_Only_SCHaas",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "get_the_returned_processlogid",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(concat(pipeline().parameters.allsources,pipeline().parameters.schaas), '01')",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "synch_only_Schaas_pipeline",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_SCHaaSMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_sos_synch_main",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "synch_only_Schaas_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_SCHaas: ',activity('synch_only_Schaas_pipeline').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_only_schaas",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "synch_only_Schaas_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (SCHaas source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference",
+                                "parameters": {
+                                    "Phoenix_db": "Phoenix_Audit"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Synch_Only_Epass",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "get_the_returned_processlogid",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(concat(pipeline().parameters.allsources,pipeline().parameters.epass), '01')",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Synch_only_Epass_pipeline",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_EPassMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_soe_synch_main",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_only_Epass_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_Epass: ',activity('Synch_only_Epass_pipeline').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_only_EPaas",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_only_Epass_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (EPaas source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Synch_Only_SAFHIRE",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "get_the_returned_processlogid",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(concat(pipeline().parameters.allsources,pipeline().parameters.safhire), '01')",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "synch_only_SAFHIRE_pipeline",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_SAFHIREMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_sosa_synch_main",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "synch_only_SAFHIRE_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_SAFHIRE: ',activity('synch_only_SAFHIRE_pipeline').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_only_SAFHIRE",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "synch_only_SAFHIRE_pipeline",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (SAFHIRE source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Synch_All_Sources",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "get_the_returned_processlogid",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@equals(pipeline().parameters.allsources, '1')",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Synch_Apollo",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_ApolloMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Synch_SCHaas",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_SCHaaSMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Synch_Epass",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_EPassMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Synch_SAFHIRE",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Synch_SAFHIREMain",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "batchid": {
+                                        "value": "@variables('batchid')",
+                                        "type": "Expression"
+                                    },
+                                    "groupid": {
+                                        "value": "@pipeline().parameters.groupid",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_apollo",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_Apollo",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_Apollo: ',activity('Synch_Apollo').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_schaas",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_SCHaas",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_SCHaas: ',activity('Synch_SCHaas').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_Epass",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_Epass",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_Epass: ',activity('Synch_Epass').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "log_the_error_SAFHIRE",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_SAFHIRE",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "Audit_pipeline",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "execution": "errorlog",
+                                    "objectname": "DESXXXXX",
+                                    "etlprogram": {
+                                        "value": "@pipeline().Pipeline",
+                                        "type": "Expression"
+                                    },
+                                    "processlogid": {
+                                        "value": "@variables('audit_processlogid')",
+                                        "type": "Expression"
+                                    },
+                                    "recordprocessed": 0,
+                                    "comment": "Synch Phoenix Data Failed with one or more data exception",
+                                    "errormessage": {
+                                        "value": "@concat('Synch_SAFHIRE: ',activity('Synch_SAFHIRE').Error.Message)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_Apollo",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_Apollo",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (Apollo source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_schaas",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_SCHaas",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (SCHaas source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_EPass",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_Epass",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (EPaas source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        },
+                        {
+                            "name": "end_the_batch_SAFHIRE",
+                            "type": "SqlServerStoredProcedure",
+                            "dependsOn": [
+                                {
+                                    "activity": "Synch_SAFHIRE",
+                                    "dependencyConditions": [
+                                        "Failed"
+                                    ]
+                                }
+                            ],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                                "storedProcedureParameters": {
+                                    "batchid": {
+                                        "value": {
+                                            "value": "@variables('batchid')",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "groupId": {
+                                        "value": {
+                                            "value": "@pipeline().parameters.groupid",
+                                            "type": "Expression"
+                                        },
+                                        "type": "Int32"
+                                    },
+                                    "comment": {
+                                        "value": "Batch Ended with Error (SAFHIRE source)",
+                                        "type": "String"
+                                    }
+                                }
+                            },
+                            "linkedServiceName": {
+                                "referenceName": "Phoenix_dev_ls",
+                                "type": "LinkedServiceReference"
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "log_the_process",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    {
+                        "activity": "Batch_type",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "Audit_pipeline",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "execution": "processlog",
+                        "status": "start",
+                        "batchid": {
+                            "value": "@variables('batchid')",
+                            "type": "Expression"
+                        },
+                        "groupid": {
+                            "value": "@pipeline().parameters.groupid",
+                            "type": "Expression"
+                        },
+                        "objectname": "DESXXXXX",
+                        "etlprogram": {
+                            "value": "@pipeline().Pipeline",
+                            "type": "Expression"
+                        },
+                        "sourcetable": "SRCXXXXX",
+                        "etlphaseId": 3
+                    }
+                }
+            },
+            {
+                "name": "get_the_returned_processlogid",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "log_the_process",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "audit_processlogid",
+                    "value": {
+                        "value": "@activity('log_the_process').output.pipelineReturnValue.ReturnedProcesslogID.firstRow.ProcessLogID",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "log_the_process_log_and_finish",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    {
+                        "activity": "Synch_only_Apollo",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Synch_Only_SCHaas",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Synch_All_Sources",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Synch_Only_SAFHIRE",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Synch_Only_Epass",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "pipeline": {
+                        "referenceName": "Audit_pipeline",
+                        "type": "PipelineReference"
+                    },
+                    "waitOnCompletion": true,
+                    "parameters": {
+                        "execution": "processlog",
+                        "status": "end",
+                        "processlogid": {
+                            "value": "@variables('audit_processlogid')",
+                            "type": "Expression"
+                        },
+                        "recordprocessed": 0,
+                        "recordinserted": 0,
+                        "recordupdated": 0,
+                        "recordwitherror": 0,
+                        "comment": "Phoenix Data was Synched successfully",
+                        "endtime": {
+                            "value": "@utcNow()",
+                            "type": "Expression"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "end_the_batch",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "log_the_process_log_and_finish",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "[dbo].[usp_ETLEndBatch]",
+                    "storedProcedureParameters": {
+                        "batchid": {
+                            "value": {
+                                "value": "@variables('batchid')",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "groupId": {
+                            "value": {
+                                "value": "@pipeline().parameters.groupid",
+                                "type": "Expression"
+                            },
+                            "type": "Int32"
+                        },
+                        "comment": {
+                            "value": "Batch Ended ",
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "Phoenix_dev_ls",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "groupid": {
+                "type": "int",
+                "defaultValue": 1
+            },
+            "execution": {
+                "type": "string",
+                "defaultValue": "manual"
+            },
+            "allsources": {
+                "type": "string",
+                "defaultValue": "0"
+            },
+            "apollo": {
+                "type": "string",
+                "defaultValue": "1"
+            },
+            "schaas": {
+                "type": "string",
+                "defaultValue": "0"
+            },
+            "epass": {
+                "type": "string",
+                "defaultValue": "0"
+            },
+            "safhire": {
+                "type": "string",
+                "defaultValue": "0"
+            }
+        },
+        "variables": {
+            "batchid": {
+                "type": "Integer",
+                "defaultValue": 1
+            },
+            "audit_processlogid": {
+                "type": "Integer"
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2023-09-01T20:02:46Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}

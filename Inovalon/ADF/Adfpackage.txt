@@ -1,0 +1,1001 @@
+{
+    "name": "CPA_Source_To_Stage_Final",
+    "properties": {
+        "activities": [
+            {
+                "name": "Iterate through each datasetname",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Get Configuration Metadata",
+                        "dependencyConditions": [
+                            "Completed"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Get Configuration Metadata').output.value",
+                        "type": "Expression"
+                    },
+                    "batchCount": 6,
+                    "activities": [
+                        {
+                            "name": "Check if source_client_id has value",
+                            "type": "IfCondition",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "expression": {
+                                    "value": "@not(equals(item().source_client_id,null))",
+                                    "type": "Expression"
+                                },
+                                "ifFalseActivities": [
+                                    {
+                                        "name": "Load Data to Stage with Date hierarchy",
+                                        "type": "Copy",
+                                        "dependsOn": [
+                                            {
+                                                "activity": "Audit Process Start for Date Hierarchy Data",
+                                                "dependencyConditions": [
+                                                    "Completed"
+                                                ]
+                                            }
+                                        ],
+                                        "policy": {
+                                            "timeout": "0.12:00:00",
+                                            "retry": 0,
+                                            "retryIntervalInSeconds": 30,
+                                            "secureOutput": false,
+                                            "secureInput": false
+                                        },
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "source": {
+                                                "type": "SqlServerSource",
+                                                "sqlReaderQuery": {
+                                                    "value": "@item().SourceQuery",
+                                                    "type": "Expression"
+                                                },
+                                                "queryTimeout": "02:00:00",
+                                                "partitionOption": "None"
+                                            },
+                                            "sink": {
+                                                "type": "ParquetSink",
+                                                "storeSettings": {
+                                                    "type": "AzureBlobFSWriteSettings",
+                                                    "maxConcurrentConnections": 5,
+                                                    "copyBehavior": "PreserveHierarchy"
+                                                },
+                                                "formatSettings": {
+                                                    "type": "ParquetWriteSettings"
+                                                }
+                                            },
+                                            "enableStaging": false,
+                                            "translator": {
+                                                "type": "TabularTranslator",
+                                                "typeConversion": true,
+                                                "typeConversionSettings": {
+                                                    "allowDataTruncation": true,
+                                                    "treatBooleanAsNumber": false
+                                                }
+                                            }
+                                        },
+                                        "inputs": [
+                                            {
+                                                "referenceName": "Apollodev",
+                                                "type": "DatasetReference",
+                                                "parameters": {
+                                                    "DATABASE_NAME": {
+                                                        "value": "@item().Source_DB_Name",
+                                                        "type": "Expression"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "outputs": [
+                                            {
+                                                "referenceName": "PhxDevAdlsPqt1",
+                                                "type": "DatasetReference"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "Audit Process Start for Date Hierarchy Data",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "Audit_pipeline",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "objectname": {
+                                                    "value": "@concat(item().Source_Dataset_Name,'-',item().source_client_id)\n",
+                                                    "type": "Expression"
+                                                },
+                                                "etlprogram": "Apollo Source to Bronze",
+                                                "sourcetable": {
+                                                    "value": "@item().Source_Dataset_Name",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "Audit Process Sucess for Date Hierarchy Data",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [
+                                            {
+                                                "activity": "Load Data to Stage with Date hierarchy",
+                                                "dependencyConditions": [
+                                                    "Succeeded"
+                                                ]
+                                            }
+                                        ],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "Audit_pipeline",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "execution": "processlog",
+                                                "status": "end",
+                                                "objectname": {
+                                                    "value": "@concat(item().Source_Dataset_Name,'-',item().source_client_id)\n",
+                                                    "type": "Expression"
+                                                },
+                                                "etlprogram": "Apollo Source to Bronze",
+                                                "sourcetable": {
+                                                    "value": "@item().Source_Dataset_Name",
+                                                    "type": "Expression"
+                                                },
+                                                "processlogid": {
+                                                    "value": "@activity('Audit Process Start for Date Hierarchy Data').output.pipelineReturnValue",
+                                                    "type": "Expression"
+                                                },
+                                                "endtime": {
+                                                    "value": "@utcnow()",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "Audit Process Failure for Date Hierarchy Data",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [
+                                            {
+                                                "activity": "Load Data to Stage with Date hierarchy",
+                                                "dependencyConditions": [
+                                                    "Failed"
+                                                ]
+                                            }
+                                        ],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "Audit_pipeline",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "execution": "errorlog",
+                                                "objectname": {
+                                                    "value": "@concat(item().Source_Dataset_Name,'-',item().source_client_id)\n",
+                                                    "type": "Expression"
+                                                },
+                                                "etlprogram": "Apollo Source to Bronze",
+                                                "sourcetable": {
+                                                    "value": "@item().Source_Dataset_Name",
+                                                    "type": "Expression"
+                                                },
+                                                "processlogid": {
+                                                    "value": "@activity('Audit Process Start for Date Hierarchy Data').output.pipelineReturnValue",
+                                                    "type": "Expression"
+                                                },
+                                                "errormessage": {
+                                                    "value": "@activity('Load Data to Stage with Date hierarchy').Error.message",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ],
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Load Data to Stage with Date and clientid Hierarchy",
+                                        "type": "Copy",
+                                        "dependsOn": [
+                                            {
+                                                "activity": "Audit Process Start",
+                                                "dependencyConditions": [
+                                                    "Completed"
+                                                ]
+                                            }
+                                        ],
+                                        "policy": {
+                                            "timeout": "0.12:00:00",
+                                            "retry": 0,
+                                            "retryIntervalInSeconds": 30,
+                                            "secureOutput": false,
+                                            "secureInput": false
+                                        },
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "source": {
+                                                "type": "SqlServerSource",
+                                                "sqlReaderQuery": {
+                                                    "value": "@item().SourceQuery",
+                                                    "type": "Expression"
+                                                },
+                                                "queryTimeout": "02:00:00",
+                                                "partitionOption": "None"
+                                            },
+                                            "sink": {
+                                                "type": "ParquetSink",
+                                                "storeSettings": {
+                                                    "type": "AzureBlobFSWriteSettings",
+                                                    "maxConcurrentConnections": 5,
+                                                    "copyBehavior": "PreserveHierarchy"
+                                                },
+                                                "formatSettings": {
+                                                    "type": "ParquetWriteSettings"
+                                                }
+                                            },
+                                            "enableStaging": false,
+                                            "translator": {
+                                                "type": "TabularTranslator",
+                                                "mappings": [
+                                                    {
+                                                        "source": {
+                                                            "name": "ActionHTTPResponseFailure",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ActionHTTPResponseFailure",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "ActionReqFailedSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ActionReqFailedSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "ActionReqPayLoad",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ActionReqPayLoad",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "ActionReqStatusCode",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ActionReqStatusCode",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "ActionReqStatusSent",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ActionReqStatusSent",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "ActionReqStatusSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ActionReqStatusSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "AssessmentTemplateID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "AssessmentTemplateID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "AssessmentTypeID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "AssessmentTypeID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "CampaignID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "CampaignID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "ClosePractitionerID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "ClosePractitionerID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "CompleteDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "CompleteDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "CompleteDateLocal",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "CompleteDateLocal",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "CreatedDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "CreatedDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "CreatedUser",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "CreatedUser",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "CurrentPCPID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "CurrentPCPID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "Denormalized",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "Denormalized",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "EncounterDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "EncounterDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "FaxReason",
+                                                            "type": "String",
+                                                            "physicalType": "varchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "FaxReason",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "IsFaxable",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "IsFaxable",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "IsFaxSentToPRP",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "IsFaxSentToPRP",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "IsStarted",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "IsStarted",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "IsXMLInDatabase",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "IsXMLInDatabase",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "LastModifiedDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "LastModifiedDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "MemberAssessmentID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "MemberAssessmentID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "MemberCampaignAppointmentID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "MemberCampaignAppointmentID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "MemberID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "MemberID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NotifiyReqStatusCode",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NotifiyReqStatusCode",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NotifyHTTPResponseFailure",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NotifyHTTPResponseFailure",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NotifyReqFailedSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NotifyReqFailedSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NotifyReqPayLoad",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NotifyReqPayLoad",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NotifyReqStatusSent",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NotifyReqStatusSent",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NotifyReqStatusSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NotifyReqStatusSentDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "NPI",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "NPI",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "OpenPractitionerID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "OpenPractitionerID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerFirstName",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerFirstName",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerLastName",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerLastName",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerLocationID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerLocationID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerMiddleName",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerMiddleName",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerPhone",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerPhone",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "PractitionerSpecialtyID",
+                                                            "type": "Int32",
+                                                            "physicalType": "int"
+                                                        },
+                                                        "sink": {
+                                                            "name": "PractitionerSpecialtyID",
+                                                            "type": "Int32",
+                                                            "physicalType": "INT_32"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "SavedAssessmentXML",
+                                                            "type": "String",
+                                                            "physicalType": "xml"
+                                                        },
+                                                        "sink": {
+                                                            "name": "SavedAssessmentXML",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "SendToMRR",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "SendToMRR",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "SentToSRSA",
+                                                            "type": "Boolean",
+                                                            "physicalType": "bit"
+                                                        },
+                                                        "sink": {
+                                                            "name": "SentToSRSA",
+                                                            "type": "Boolean",
+                                                            "physicalType": "BOOLEAN"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "UpdatedDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "UpdatedDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "UpdatedUser",
+                                                            "type": "String",
+                                                            "physicalType": "nvarchar"
+                                                        },
+                                                        "sink": {
+                                                            "name": "UpdatedUser",
+                                                            "type": "String",
+                                                            "physicalType": "UTF8"
+                                                        }
+                                                    },
+                                                    {
+                                                        "source": {
+                                                            "name": "VendorReportDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "datetime"
+                                                        },
+                                                        "sink": {
+                                                            "name": "VendorReportDate",
+                                                            "type": "DateTime",
+                                                            "physicalType": "INT_96"
+                                                        }
+                                                    }
+                                                ],
+                                                "typeConversion": true,
+                                                "typeConversionSettings": {
+                                                    "allowDataTruncation": false,
+                                                    "treatBooleanAsNumber": false,
+                                                    "dateTimeFormat": "yyyy-MM-dd HH:mm:ss:fff"
+                                                }
+                                            }
+                                        },
+                                        "inputs": [
+                                            {
+                                                "referenceName": "Apollodev",
+                                                "type": "DatasetReference",
+                                                "parameters": {
+                                                    "DATABASE_NAME": {
+                                                        "value": "@item().Source_DB_Name",
+                                                        "type": "Expression"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "outputs": [
+                                            {
+                                                "referenceName": "PhxDevAdlsPqt1",
+                                                "type": "DatasetReference"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "Audit Process Start",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "Audit_pipeline",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "objectname": {
+                                                    "value": "@concat(item().Source_Dataset_Name,'-',item().source_client_id)\n",
+                                                    "type": "Expression"
+                                                },
+                                                "etlprogram": "Apollo Source to Bronze",
+                                                "sourcetable": {
+                                                    "value": "@item().Source_Dataset_Name",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "Audit Process Failure",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [
+                                            {
+                                                "activity": "Load Data to Stage with Date and clientid Hierarchy",
+                                                "dependencyConditions": [
+                                                    "Failed"
+                                                ]
+                                            }
+                                        ],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "Audit_pipeline",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "execution": "errorlog",
+                                                "objectname": {
+                                                    "value": "@concat(item().Source_Dataset_Name,'-',item().source_client_id)\n",
+                                                    "type": "Expression"
+                                                },
+                                                "etlprogram": "Apollo Source to Bronze",
+                                                "sourcetable": {
+                                                    "value": "@item().Source_Dataset_Name",
+                                                    "type": "Expression"
+                                                },
+                                                "processlogid": {
+                                                    "value": "@activity('Audit Process Start').output.pipelineReturnValue",
+                                                    "type": "Expression"
+                                                },
+                                                "errormessage": {
+                                                    "value": "@activity('Load Data to Stage with Date and clientid Hierarchy').Error.message",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "name": "Audit Process Sucess",
+                                        "type": "ExecutePipeline",
+                                        "dependsOn": [
+                                            {
+                                                "activity": "Load Data to Stage with Date and clientid Hierarchy",
+                                                "dependencyConditions": [
+                                                    "Succeeded"
+                                                ]
+                                            }
+                                        ],
+                                        "userProperties": [],
+                                        "typeProperties": {
+                                            "pipeline": {
+                                                "referenceName": "Audit_pipeline",
+                                                "type": "PipelineReference"
+                                            },
+                                            "waitOnCompletion": true,
+                                            "parameters": {
+                                                "execution": "processlog",
+                                                "status": "end",
+                                                "objectname": {
+                                                    "value": "@concat(item().Source_Dataset_Name,'-',item().source_client_id)\n",
+                                                    "type": "Expression"
+                                                },
+                                                "etlprogram": "Apollo Source to Bronze",
+                                                "sourcetable": {
+                                                    "value": "@item().Source_Dataset_Name",
+                                                    "type": "Expression"
+                                                },
+                                                "processlogid": {
+                                                    "value": "@activity('Audit Process Start').output.pipelineReturnValue",
+                                                    "type": "Expression"
+                                                },
+                                                "endtime": {
+                                                    "value": "@utcnow()",
+                                                    "type": "Expression"
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Get Configuration Metadata",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "SqlServerSource",
+                        "sqlReaderQuery": "exec [dbo].[Usp_Get_Source_Datasets_To_Load_Bronze]   'CPA',0\n",
+                        "queryTimeout": "02:00:00",
+                        "partitionOption": "None"
+                    },
+                    "dataset": {
+                        "referenceName": "Phoenix_Audit_dataset_config",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            }
+        ],
+        "variables": {
+            "first_value": {
+                "type": "String"
+            },
+            "filepath": {
+                "type": "String"
+            },
+            "count": {
+                "type": "Integer"
+            }
+        },
+        "folder": {
+            "name": "Apollo Template"
+        },
+        "annotations": []
+    }
+}
