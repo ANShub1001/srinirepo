@@ -1,0 +1,24 @@
+-- Sample T-SQL script to check data in a SQL Server table
+USE YourDatabase;
+
+-- Check the count of records in a table
+DECLARE @RecordCount INT;
+SELECT @RecordCount = COUNT(*) FROM YourTable;
+
+-- Verify that the record count is as expected
+IF @RecordCount = ExpectedRecordCount
+BEGIN
+    -- Test passed
+    PRINT 'Integration test passed: Record count matches the expected count.';
+END
+ELSE
+BEGIN
+    -- Test failed
+    PRINT 'Integration test failed: Record count does not match the expected count.';
+END
+You can create multiple such T-SQL scripts within your SQL Server job to perform various tests as part of the initial load integration testing process.
+
+
+
+
+

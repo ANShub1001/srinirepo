@@ -1,0 +1,334 @@
+
+USE [PHX_GOLD_ME_Test]
+
+/* Create a new filegroup for the  schema */
+IF NOT EXISTS (SELECT * FROM SYS.filegroups WHERE NAME='SCC_PA_PHX_GOLD_ME_Test_FileGroup')
+BEGIN
+ALTER DATABASE PHX_GOLD_ME_Test
+ADD FILEGROUP SCC_PA_PHX_GOLD_ME_Test_FileGroup
+END
+ELSE
+BEGIN
+PRINT 'SCC_PA_PHX_GOLD_ME_Test_FileGroup already exists'
+END
+/**************************************************************************************************************************/
+/*creation of file */
+
+ALTER DATABASE PHX_GOLD_ME_Test
+ADD FILE (
+    NAME = 'SCC_PA_PHX_GOLD_ME_CPA_Clients_DataFile',
+    FILENAME = 'F:\data\SCC_PA_PHX_GOLD_ME_CPA_Clients_DataFile.ndf',
+    SIZE = 100MB,	
+    MAXSIZE = UNLIMITED,
+    FILEGROWTH = 10MB   
+)
+TO FILEGROUP SCC_PA_PHX_GOLD_ME_Test_FileGroup;
+
+
+/**************************************************************************************************************************/
+
+IF NOT EXISTS
+(
+    SELECT schema_name
+    FROM information_schema.schemata
+    WHERE schema_name = 'SCC_PA'
+)
+BEGIN
+    EXEC ('CREATE SCHEMA SCC_PA')
+END
+
+
+
+IF NOT EXISTS
+(
+    SELECT *
+    FROM INFORMATION_SCHEMA.tables
+    WHERE TABLE_NAME = 'Tbl_MemberAssessment'
+          and TABLE_SCHEMA = 'SCC_PA'
+)
+BEGIN
+
+CREATE TABLE SCC_PA.Tbl_MemberAssessment
+(
+	
+      
+        [MemberAssessmentID] [int] NOT NULL,
+        Client_Id int Not Null,
+        [MemberID] [int]  NULL,
+	[CampaignID] [int]  NULL,
+	[EncounterDate] [datetime]  NULL,
+	[CompleteDate] [datetime] NULL,
+	[CompleteDateLocal] [datetime] NULL,
+	[LastModifiedDate] [datetime]  NULL,
+	[IsStarted] [bit]  NULL,
+	[MemberCampaignAppointmentID] [int] NULL,
+	[PractitionerID] [int] NULL,
+	[PractitionerFirstName] [nvarchar](30) NULL,
+	[PractitionerMiddleName] [nvarchar](30) NULL,
+	[PractitionerLastName] [nvarchar](75)  NULL,
+	[NPI] [nvarchar](50) NULL,
+	[PractitionerLocationID] [int] NULL,
+	[PractitionerPhone] [nvarchar](25)  NULL,
+	[PractitionerSpecialtyID] [int] NULL,
+	[SavedAssessmentXML] [xml] NULL,
+	[AssessmentTemplateID] [int] NULL,
+	[NotifyReqStatusSent] [bit] NULL,
+	[ActionReqStatusSent] [bit] NULL,
+	[NotifyReqStatusSentDate] [datetime] NULL,
+	[ActionReqStatusSentDate] [datetime] NULL,
+	[ActionReqFailedSentDate] [datetime] NULL,
+	[NotifyReqFailedSentDate] [datetime] NULL,
+	[NotifyReqPayLoad] [nvarchar](max) NULL,
+	[ActionReqPayLoad] [nvarchar](max) NULL,
+	[NotifiyReqStatusCode] [nvarchar](20) NULL,
+	[ActionReqStatusCode] [nvarchar](20) NULL,
+	[NotifyHTTPResponseFailure] [nvarchar](max) NULL,
+	[ActionHTTPResponseFailure] [nvarchar](max) NULL,
+	[Denormalized] [bit] NULL,
+	[OpenPractitionerID] [int] NULL,
+	[ClosePractitionerID] [int] NULL,
+	[SentToSRSA] [bit] NULL,
+	[SendToMRR] [bit] NULL,
+	[VendorReportDate] [datetime] NULL,
+	[CurrentPCPID] [int] NULL,
+	[AssessmentTypeID] [int] NULL,
+	[IsFaxSentToPRP] [bit] NULL,
+	[IsFaxable] [bit] NULL,
+	[FaxReason] [varchar](250) NULL,
+	[CreatedDate] [datetime] NULL,
+	[UpdatedDate] [datetime] NULL,
+	[CreatedUser] [nvarchar](50) NULL,
+	[UpdatedUser] [nvarchar](50) NULL,
+	[IsXMLInDatabase] [bit]  NULL,
+        loaddatetime datetime not null Default getdate(),
+   CONSTRAINT [PK_IX_Tbl_MemberAssessment_MemberAssessmentID_Client_Id] PRIMARY KEY CLUSTERED 
+(
+	[MemberAssessmentID] ASC,
+         [Client_Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [SCC_PA_PHX_GOLD_ME_Test_FileGroup]
+ ) on SCC_PA_PHX_GOLD_ME_Test_FileGroup
+END
+ELSE
+BEGIN
+    PRINT 'Table SCC_PA.Tbl_MemberAssessment already exists';
+
+END
+
+/***************************************************************************************************************************************/
+
+IF NOT EXISTS
+(
+    SELECT schema_name
+    FROM information_schema.schemata
+    WHERE schema_name = 'SCC_PA'
+)
+BEGIN
+    EXEC ('CREATE SCHEMA SCC_PA')
+END
+
+
+
+IF NOT EXISTS
+(
+    SELECT *
+    FROM INFORMATION_SCHEMA.tables
+    WHERE TABLE_NAME = 'Tbl_MemberAssessmentHistory'
+          and TABLE_SCHEMA = 'SCC_PA'
+)
+BEGIN
+
+CREATE TABLE SCC_PA.Tbl_MemberAssessmentHistory
+(
+       
+        [MemberAssessmentHistoryID] [int]  Not NULL,
+        Client_Id int Not Null,
+        [MemberAssessmentID] [int]  NULL,
+	[MemberID] [int]  NULL,
+	[CampaignID] [int]  NULL,
+	[EncounterDate] [datetime]  NULL,
+	[CompleteDate] [datetime] NULL,
+	[CompleteDateLocal] [datetime] NULL,
+	[LastModifiedDate] [datetime]  NULL,
+	[IsStarted] [bit]  NULL,
+	[MemberCampaignAppointmentID] [int] NULL,
+	[PractitionerID] [int] NULL,
+	[PractitionerFirstName] [nvarchar](30) NULL,
+	[PractitionerMiddleName] [nvarchar](30)  NULL,
+	[PractitionerLastName] [nvarchar](75) NULL,
+	[NPI] [nvarchar](50) NULL,
+	[PractitionerLocationID] [int] NULL,
+	[PractitionerPhone] [nvarchar](25) NULL,
+	[PractitionerSpecialtyID] [int] NULL,
+	[SavedAssessmentXML] [xml] NULL,
+	[AssessmentTemplateID] [int] NULL,
+	[NotifyReqStatusSent] [bit] NULL,
+	[ActionReqStatusSent] [bit] NULL,
+	[NotifyReqStatusSentDate] [datetime] NULL,
+	[ActionReqStatusSentDate] [datetime] NULL,
+	[ActionReqFailedSentDate] [datetime] NULL,
+	[NotifyReqFailedSentDate] [datetime] NULL,
+	[NotifyReqPayLoad] [nvarchar](max) NULL,
+	[ActionReqPayLoad] [nvarchar](max) NULL,
+	[NotifiyReqStatusCode] [nvarchar](20) NULL,
+	[ActionReqStatusCode] [nvarchar](20) NULL,
+	[NotifyHTTPResponseFailure] [nvarchar](max) NULL,
+	[ActionHTTPResponseFailure] [nvarchar](max) NULL,
+	[Denormalized] [bit] NULL,
+	[OpenPractitionerID] [int] NULL,
+	[ClosePractitionerID] [int] NULL,
+	[SentToSRSA] [bit] NULL,
+	[SendToMRR] [bit] NULL,
+	[VendorReportDate] [datetime] NULL,
+	[CurrentPCPID] [int] NULL,
+	[AssessmentTypeID] [int] NULL,
+	[IsFaxSentToPRP] [bit] NULL,
+	[IsFaxable] [bit] NULL,
+	[ReasonCodeID] [int] NULL,
+	[IsAmendmentReportedToPseudoCodeRepository] [bit] NULL,
+	[VersionNo] [int]  NULL,
+	[FaxReason] [varchar](250) NULL,
+	[CreatedDate] [datetime] NULL,
+	[UpdatedDate] [datetime] NULL,
+	[CreatedUser] [nvarchar](50) NULL,
+	[UpdatedUser] [nvarchar](50) NULL,	
+        loaddatetime datetime not null Default getdate(),
+CONSTRAINT [PK_IX_Tbl_MemberAssessmenthistory_MemberAssessmentHistoryId_client_Id] PRIMARY KEY CLUSTERED 
+(
+	 [MemberAssessmentHistoryID] ASC,
+	[Client_Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [SCC_PA_PHX_GOLD_ME_Test_FileGroup]
+ ) on SCC_PA_PHX_GOLD_ME_Test_FileGroup
+           
+
+END
+ELSE
+BEGIN
+    PRINT 'Table SCC_PA.Tbl_MemberAssessmentHistory already exists';
+
+END
+
+/********************************************************************************************************************************/
+
+IF NOT EXISTS
+(
+    SELECT schema_name
+    FROM information_schema.schemata
+    WHERE schema_name = 'SCC_PA'
+)
+BEGIN
+    EXEC ('CREATE SCHEMA SCC_PA')
+END
+
+
+
+IF NOT EXISTS
+(
+    SELECT *
+    FROM INFORMATION_SCHEMA.tables
+    WHERE TABLE_NAME = 'Tbl_Segment'
+          and TABLE_SCHEMA = 'SCC_PA'
+)
+BEGIN
+
+CREATE TABLE SCC_PA.Tbl_Segment
+(
+        
+        [SegmentID] [int]  Not NULL,
+        Client_Id int Not Null,
+        [SegmentName] [varchar](50) NULL,
+	[SegmentDescription] [varchar](200) NULL,
+	[SystemName] [varchar](50) NULL,
+	[IsAvailableForPCP] [bit]  NULL,
+	[CreatedDate] [datetime] NULL,
+	[UpdatedDate] [datetime] NULL,
+	[CreatedUser] [nvarchar](50) NULL,
+	[UpdatedUser] [nvarchar](50) NULL,
+        loaddatetime datetime not null Default getdate(),
+    CONSTRAINT [PK_IX_Tbl_Segment_SegmentID_client_Id] PRIMARY KEY CLUSTERED 
+(
+	[SegmentID] ASC,
+	[Client_Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [SCC_PA_PHX_GOLD_ME_Test_FileGroup]
+ ) on SCC_PA_PHX_GOLD_ME_Test_FileGroup   
+
+END
+ELSE
+BEGIN
+    PRINT 'Table SCC_PA.Tbl_Segment already exists';
+
+END
+/*****************************************************************************************************************/
+
+IF NOT EXISTS
+(
+    SELECT schema_name
+    FROM information_schema.schemata
+    WHERE schema_name = 'SCC_PA'
+)
+BEGIN
+    EXEC ('CREATE SCHEMA SCC_PA')
+END
+
+
+
+IF NOT EXISTS
+(
+    SELECT *
+    FROM INFORMATION_SCHEMA.tables
+    WHERE TABLE_NAME = 'Tbl_MemberCampaign'
+          and TABLE_SCHEMA = 'SCC_PA'
+)
+BEGIN
+
+CREATE table SCC_PA.Tbl_MemberCampaign
+(
+        
+        [MemberID] [int] Not NULL,
+        Client_Id int Not  Null,
+        [CampaignID] [int]  NULL,
+	[LineofBusinessID] [int]  NULL,
+	[SegmentTypeID] [int]  NULL,
+	[IsActive] [bit]  NULL,
+	[Incentive] [int]  NULL,
+	[ActiveDate] [datetime] NULL,
+	[DeActivateDate] [datetime] NULL,
+	[DateCreated] [datetime] NULL,
+	[OutReachStatusID] [int] NULL,
+	[Potential] [int] NULL,
+	[IsNuro] [bit] NULL,
+	[MemberLetterID] [int] NULL,
+	[PCPPractitionerID] [int] NULL,
+	[TransferID] [int] NULL,
+	[LetterDate] [datetime] NULL,
+	[HContract] [nvarchar](20) NULL,
+	[IsNewEnrollee] [bit] NULL,
+	[AllowAnotherSoapNote] [bit] NULL,
+	[IsHRA] [bit] NULL,
+	[CreatedDate] [datetime] NULL,
+	[UpdatedDate] [datetime] NULL,
+	[CreatedUser] [nvarchar](50) NULL,
+	[UpdatedUser] [nvarchar](50) NULL,
+        loaddatetime datetime not null Default getdate(),
+CONSTRAINT [PK_IX_Tbl_MemberCampaign_MemberID_client_Id] PRIMARY KEY CLUSTERED 
+(
+	[MemberID] ASC,
+	[Client_Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [SCC_PA_PHX_GOLD_ME_Test_FileGroup]
+ ) on SCC_PA_PHX_GOLD_ME_Test_FileGroup
+     
+END
+ELSE
+BEGIN
+    PRINT 'Table SCC_PA.Tbl_MemberCampaign already exists';
+
+END
+
+/***************************************************************************************************************/
+
+ 
+
+
+
+
+
+
