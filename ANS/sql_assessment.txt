@@ -1,0 +1,28 @@
+1A.with A
+ As
+ (
+  select customer_id, Avg(quantity) Average_of_quantity from sales group by customer_id
+  )
+select customer_id,Average_of_quantity, DENSE_RANK() over( order by Average_of_quantity Desc) DR from A;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+2A.   select product_id, Avg(quantity) over ( partition by product_id,order_date order by product_id rows between 4 preceding and current row  )  avge_of_quantity from sales 
+
+3A.
+
+
+1. ROW_NUMBER()
+The ROW_NUMBER() function in SQL Server assigns a unique rank to each row within the result set without considering duplicate values. Each row gets a unique, incrementing rank value.
+
+
+2. RANK()
+The RANK() function in SQL assigns a unique rank to each row within the result set, with gaps in ranking values when there are duplicate values in the order. Rows with the same values get the same rank, and the next rank is skipped.
+
+
+
+
+4A.
+  select * from customer_data where email like '%@gmail.com%'
+
+
+  

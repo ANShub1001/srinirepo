@@ -1,0 +1,30 @@
+
+1.what i have to do if my table having comsite primary key on the table.
+2.what i have to do if identity column is alredy Exist on the table.
+3.Are we there any elemnating the varchar(max) data types.
+4.Are we eleminating XML datatype columns.
+5.Are we eleminating any other rows datatype columns
+6.Are we Adding client_Id columns to all the tables or tables which are having client information.
+
+1.whenever we are creating tables in silver layer what datatype columns we are need to ignore
+(like varchar(max) is there any other datatype colums we are ignoring)
+2.client_id should be created when tables having client data only right.
+3.whenever we creating table in silver layer what if source table already having identity column,
+what should i do composite primary key alredy Existing on the source table.
+
+for example for Tbl_MemberCampaign table 
+
+Member_sortkey int identity(1, 1) Not Null,
+client_id int not null,
+ 
+on the combination of two columns i need to create index on right.
+
+/***********************************************************************************************************/
+sql doubts in silver layer.
+
+1.who we will get value for client_id column when ever we loading data from bronze to silver,
+beause we dont have client_id column in source side,then how we can fill the client_id column with proper client_id value.
+
+2.Are we creating primary key columns in silver layer tables.here we already created clustred index on _sort key column and client_id column 
+(then two clustred index it will not allow rihgt, then what to do.)
+3.not nulls
