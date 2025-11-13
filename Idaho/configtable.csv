@@ -1,0 +1,4 @@
+Controlid,SourceSystem,SourceType,ScheaName,SourceObjectName,LoadType,LoadStoredProcedure,IncrementalColumn,IncrementalColumnDataType,LastWatermarkValue,DestinationZone,Linkedservername
+1,SQL,Table,dbo,encounters,Incrementalload,,Start,DateTime2,2010-01-01,Bronze,
+2,SQL,Table,dbo,procedures,Incrementalload,,Start,DateTime2,2010-01-01,Bronze,
+3,ADLS,File,Raw,patients,Incrementalload,,Last Modified,DateTime2,2010-01-01,Bronze,
